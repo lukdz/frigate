@@ -125,7 +125,7 @@ class StorageMaintainer(threading.Thread):
             [b["bandwidth"] for b in self.camera_storage_stats.values()]
         )
 
-        recordings = (
+        recordings_cursor = (
             Recordings.select(
                 Recordings.id,
                 Recordings.camera,
@@ -136,8 +136,9 @@ class StorageMaintainer(threading.Thread):
             )
             .order_by(Recordings.start_time.asc())
             .namedtuples()
-            .iterator()
+            .execute()
         )
+        recordings = recordings_cursor.iterator()
 
         retained_events = (
             Event.select(
@@ -157,6 +158,10 @@ class StorageMaintainer(threading.Thread):
         for recording in recordings:
             # check if 1 hour of storage has been reclaimed
             if deleted_segments_size > hourly_bandwidth:
+                # exhausting a cursor closes it automatically, but breaking
+                # early skips that, leaving it open and pinning the
+                # connection's view of the database to a stale snapshot
+                recordings_cursor.cursor.close()
                 break
 
             keep = False
@@ -199,7 +204,7 @@ class StorageMaintainer(threading.Thread):
             logger.error(
                 f"Could not clear {hourly_bandwidth} MB, currently {deleted_segments_size:.2f} MB have been cleared. Retained recordings must be deleted."
             )
-            recordings = (
+            recordings_cursor = (
                 Recordings.select(
                     Recordings.id,
                     Recordings.camera,
@@ -210,11 +215,13 @@ class StorageMaintainer(threading.Thread):
                 )
                 .order_by(Recordings.start_time.asc())
                 .namedtuples()
-                .iterator()
+                .execute()
             )
+            recordings = recordings_cursor.iterator()
 
             for recording in recordings:
                 if deleted_segments_size > hourly_bandwidth:
+                    recordings_cursor.cursor.close()
                     break
 
                 try:

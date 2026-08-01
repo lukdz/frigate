@@ -260,6 +260,32 @@ class TestHttp(unittest.TestCase):
         assert Recordings.get(Recordings.id == rec_k2_id)
         assert Recordings.get(Recordings.id == rec_k3_id)
 
+    def test_storage_cleanup_closes_cursor_on_early_break(self):
+        """Ensure breaking out of the deletion loop early doesn't leave a stale read snapshot."""
+        config = FrigateConfig(**self.minimal_config)
+        storage = StorageMaintainer(config, MagicMock())
+        storage.camera_storage_stats = {
+            "front_door": {"bandwidth": 20, "needs_refresh": False}
+        }
+
+        time_delete = datetime.datetime.now().timestamp() - 7200
+        for i in range(20):
+            id = f"{123456 + i}.delete"
+            _insert_mock_recording(
+                id,
+                os.path.join(self.test_dir, f"{id}.tmp"),
+                time_delete + i * 10,
+                time_delete + i * 10 + 10,
+                seg_size=10,
+            )
+
+        storage.reduce_storage_consumption()
+
+        # the deletion loop breaks well before exhausting all 20 recordings
+        # (target is only 20 MB), so this immediate re-select must not see
+        # stale, pre-delete rows
+        assert Recordings.select().count() == 17
+
 
 def _insert_mock_event(
     id: str,
