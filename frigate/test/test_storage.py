@@ -169,6 +169,51 @@ class TestHttp(unittest.TestCase):
             )
             assert storage.check_storage_needs_cleanup()
 
+    def test_storage_cleanup_reclaims_full_percent_deficit_in_one_pass(self):
+        """Ensure a single cleanup pass reclaims the full percent-based deficit, not just the hourly amount."""
+        config = self.minimal_config | {
+            "record": {"storage_limit": {"max_usage_percent": 80}}
+        }
+        frigate_config = FrigateConfig(**config)
+        storage = StorageMaintainer(frigate_config, MagicMock())
+        storage.camera_storage_stats = {
+            "front_door": {"bandwidth": 20, "needs_refresh": False}
+        }
+
+        time_delete = datetime.datetime.now().timestamp() - 7200
+        files = []
+        for i in range(20):
+            id = f"{123456 + i}.delete"
+            file = os.path.join(self.test_dir, f"{id}.tmp")
+            _insert_mock_recording(
+                id,
+                file,
+                time_delete + i * 10,
+                time_delete + i * 10 + 10,
+                seg_size=10,
+            )
+            files.append(file)
+
+        with patch("frigate.storage.shutil.disk_usage") as disk_usage:
+            disk_usage.return_value = MagicMock(
+                total=1000 * pow(2, 20),
+                used=950 * pow(2, 20),
+                free=50 * pow(2, 20),
+            )
+            # deficit (150 MB) is far larger than the hourly bandwidth (20 MB)
+            assert storage.get_cleanup_target_size() == 150
+
+            storage.reduce_storage_consumption()
+
+        # 16 of the 20 recordings (160 MB) must be removed on disk to clear the
+        # deficit, not just the 2-3 the old hourly-only target would remove.
+        # Checked on disk rather than via a DB re-select, since the recordings
+        # iterator used by reduce_storage_consumption breaks early once the
+        # target is met, leaving its cursor open and the read connection's
+        # view stale until it is closed elsewhere.
+        removed = [file for file in files if not os.path.exists(file)]
+        assert len(removed) == 16
+
     def test_storage_cleanup_with_less_than_one_hour_free(self):
         """Ensure the existing low available storage check remains active."""
         config = FrigateConfig(**self.minimal_config)
