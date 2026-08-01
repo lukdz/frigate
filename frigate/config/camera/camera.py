@@ -34,7 +34,7 @@ from .notification import NotificationConfig
 from .objects import ObjectConfig
 from .onvif import OnvifConfig
 from .profile import CameraProfileConfig
-from .record import RecordConfig
+from .record import CameraRecordConfig
 from .review import ReviewConfig
 from .snapshots import SnapshotsConfig
 from .timestamp import TimestampStyleConfig
@@ -122,8 +122,8 @@ class CameraConfig(FrigateBaseModel):
         title="Objects",
         description="Object tracking defaults including which labels to track and per-object filters.",
     )
-    record: RecordConfig = Field(
-        default_factory=RecordConfig,
+    record: CameraRecordConfig = Field(
+        default_factory=CameraRecordConfig,
         title="Recording",
         description="Recording and retention settings for this camera.",
     )

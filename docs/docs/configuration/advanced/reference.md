@@ -557,7 +557,7 @@ notifications:
   cooldown: 0
 
 # Optional: Record configuration
-# NOTE: Can be overridden at the camera level
+# NOTE: Can be overridden at the camera level except for storage_limit
 record:
   # Optional: Enable recording (default: shown below)
   # WARNING: If recording is disabled in the config, turning it on via
@@ -566,6 +566,11 @@ record:
   # Optional: Number of minutes to wait between cleanup runs (default: shown below)
   # This can be used to reduce the frequency of deleting recording segments from disk if you want to minimize i/o
   expire_interval: 60
+  # Optional: Global recording storage limit
+  # NOTE: This cannot be overridden at the camera level.
+  storage_limit:
+    # Optional: Disk usage percentage that triggers deletion of the oldest recordings (default: shown below)
+    max_usage_percent: 100
   # Optional: Continuous retention settings
   continuous:
     # Optional: Number of days to retain recordings regardless of tracked objects or motion (default: shown below)

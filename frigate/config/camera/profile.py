@@ -11,7 +11,7 @@ from .detect import DetectConfig
 from .motion import MotionConfig
 from .notification import NotificationConfig
 from .objects import ObjectConfig
-from .record import RecordConfig
+from .record import CameraRecordConfig
 from .review import ReviewConfig
 from .snapshots import SnapshotsConfig
 from .zone import ZoneConfig
@@ -36,7 +36,7 @@ class CameraProfileConfig(FrigateBaseModel):
     motion: MotionConfig | None = None
     notifications: NotificationConfig | None = None
     objects: ObjectConfig | None = None
-    record: RecordConfig | None = None
+    record: CameraRecordConfig | None = None
     review: ReviewConfig | None = None
     snapshots: SnapshotsConfig | None = None
     zones: dict[str, ZoneConfig] | None = None

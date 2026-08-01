@@ -106,16 +106,24 @@ class StorageMaintainer(threading.Thread):
 
     def check_storage_needs_cleanup(self) -> bool:
         """Return if storage needs cleanup."""
-        # currently runs cleanup if less than 1 hour of space is left
         # disk_usage should not spin up disks
         hourly_bandwidth = sum(
             [b["bandwidth"] for b in self.camera_storage_stats.values()]
         )
-        remaining_storage = round(shutil.disk_usage(RECORD_DIR).free / pow(2, 20), 1)
+        disk_usage = shutil.disk_usage(RECORD_DIR)
+        remaining_storage = round(disk_usage.free / pow(2, 20), 1)
+        used_percent = disk_usage.used / disk_usage.total * 100
+        max_usage_percent = self.config.record.storage_limit.max_usage_percent
         logger.debug(
-            f"Storage cleanup check: {hourly_bandwidth} hourly with remaining storage: {remaining_storage}."
+            "Storage cleanup check: %s hourly with remaining storage: %s, disk usage: %.1f%%",
+            hourly_bandwidth,
+            remaining_storage,
+            used_percent,
         )
-        return remaining_storage < float(hourly_bandwidth)
+        return (
+            remaining_storage < float(hourly_bandwidth)
+            or used_percent >= max_usage_percent
+        )
 
     def reduce_storage_consumption(self) -> None:
         """Remove oldest hour of recordings."""
@@ -295,7 +303,7 @@ class StorageMaintainer(threading.Thread):
 
             if self.check_storage_needs_cleanup():
                 logger.info(
-                    "Less than 1 hour of recording space left, running storage maintenance..."
+                    "Recording storage threshold reached, running storage maintenance"
                 )
                 self.reduce_storage_consumption()
 

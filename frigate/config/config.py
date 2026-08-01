@@ -778,6 +778,13 @@ class FrigateConfig(FrigateBaseModel):
                         if k in allowed_fields_map[section]
                     }
 
+            if "record" in modified_global_config:
+                modified_global_config["record"] = {
+                    k: v
+                    for k, v in modified_global_config["record"].items()
+                    if k != "storage_limit"
+                }
+
             merged_config = deep_merge(
                 camera.model_dump(exclude_unset=True), modified_global_config
             )

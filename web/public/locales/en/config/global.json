@@ -1035,6 +1035,14 @@
     "enabled_in_config": {
       "label": "Original recording state",
       "description": "Indicates whether recording was enabled in the original static configuration."
+    },
+    "storage_limit": {
+      "label": "Recording storage limit",
+      "description": "Global disk usage limit for recording storage.",
+      "max_usage_percent": {
+        "label": "Maximum disk usage",
+        "description": "Disk usage percentage that triggers deletion of the oldest recordings."
+      }
     }
   },
   "review": {

@@ -403,11 +403,22 @@ Because usage is tracked in the database, deleting recording files directly on d
 
 ## Will Frigate delete old recordings if my storage runs out?
 
-Yes. Frigate continuously checks the **free space of the disk** holding `/media/frigate/recordings`. This is different from adding up the size of every recording: free space is a single number the operating system already tracks, so Frigate can ask for it instantly without reading through your files or spinning up the disk, which is exactly why it relies on this check rather than scanning the drive. When less than roughly one hour of recording space remains (estimated from the current recording bitrate, **not** a fixed percentage), Frigate deletes the oldest recordings to reclaim space and logs a message. This emergency cleanup removes the oldest recordings first **regardless of retention settings**.
+Yes. Frigate checks the **free space and used percentage of the disk** holding `/media/frigate/recordings` every five minutes. These are values the operating system already tracks, so Frigate can retrieve them without scanning the drive or spinning it up.
+
+By default, cleanup runs when less than roughly one hour of recording space remains, estimated from the current recording bitrate. You can also set a global disk usage threshold:
+
+```yaml
+record:
+  enabled: true
+  storage_limit:
+    max_usage_percent: 90
+```
+
+`max_usage_percent` accepts a value from `1` through `100` and cannot be overridden per camera. Cleanup runs when either this percentage is reached or less than roughly one hour of recording space remains. Frigate deletes the oldest recordings to reclaim approximately one hour of space and logs a message. This emergency cleanup removes the oldest recordings first **regardless of retention settings**.
 
 Two consequences follow from this being based on whole-disk free space:
 
 - Because the check uses the disk's real free space, **anything** filling the drive, including non-Frigate files, can trigger deletion of your oldest recordings.
-- Cleanup can run while a meaningful percentage of the disk is still free (for example, with high bitrates or many cameras), because the threshold is "less than ~1 hour of recording headroom," not "X% full."
+- Cleanup can run before `max_usage_percent` is reached (for example, with high bitrates or many cameras) because the one-hour recording headroom safeguard remains active.
 
 Frequent emergency cleanups usually mean your configured retention exceeds what the disk can hold. Reduce your retention days so the normal retention cleanup keeps up and the emergency path rarely triggers.

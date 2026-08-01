@@ -8,11 +8,13 @@ from frigate.review.types import SeverityEnum
 from ..base import FrigateBaseModel
 
 __all__ = [
+    "CameraRecordConfig",
     "ChaptersEnum",
     "RecordConfig",
     "RecordExportConfig",
     "RecordPreviewConfig",
     "RecordQualityEnum",
+    "RecordStorageLimitConfig",
     "EventsConfig",
     "ReviewRetainConfig",
     "RecordRetainConfig",
@@ -110,7 +112,7 @@ class RecordExportConfig(FrigateBaseModel):
     )
 
 
-class RecordConfig(FrigateBaseModel):
+class CameraRecordConfig(FrigateBaseModel):
     enabled: bool = Field(
         default=False,
         title="Enable recording",
@@ -175,3 +177,21 @@ class RecordConfig(FrigateBaseModel):
             return self.alerts.post_capture
         else:
             return self.detections.post_capture
+
+
+class RecordStorageLimitConfig(FrigateBaseModel):
+    max_usage_percent: int = Field(
+        default=100,
+        ge=1,
+        le=100,
+        title="Maximum disk usage",
+        description="Disk usage percentage that triggers deletion of the oldest recordings.",
+    )
+
+
+class RecordConfig(CameraRecordConfig):
+    storage_limit: RecordStorageLimitConfig = Field(
+        default_factory=RecordStorageLimitConfig,
+        title="Recording storage limit",
+        description="Global disk usage limit for recording storage.",
+    )

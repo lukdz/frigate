@@ -3,12 +3,13 @@ import logging
 import os
 import tempfile
 import unittest
-from unittest.mock import MagicMock
+from unittest.mock import MagicMock, patch
 
 from peewee import DoesNotExist
 from peewee_migrate import Router
 from playhouse.sqlite_ext import SqliteExtDatabase
 from playhouse.sqliteq import SqliteQueueDatabase
+from pydantic import ValidationError
 
 from frigate.config import FrigateConfig
 from frigate.models import Event, Recordings
@@ -31,6 +32,8 @@ class TestHttp(unittest.TestCase):
 
         self.minimal_config = {
             "mqtt": {"host": "mqtt"},
+            "detectors": {"test": {"type": "zmq"}},
+            "model": {"labelmap_path": "labelmap.txt"},
             "cameras": {
                 "front_door": {
                     "ffmpeg": {
@@ -48,6 +51,8 @@ class TestHttp(unittest.TestCase):
         }
         self.double_cam_config = {
             "mqtt": {"host": "mqtt"},
+            "detectors": {"test": {"type": "zmq"}},
+            "model": {"labelmap_path": "labelmap.txt"},
             "cameras": {
                 "front_door": {
                     "ffmpeg": {
@@ -138,6 +143,56 @@ class TestHttp(unittest.TestCase):
         assert storage.camera_storage_stats == {
             "front_door": {"bandwidth": 0, "needs_refresh": True},
         }
+
+    def test_storage_cleanup_at_max_usage_percent(self):
+        """Ensure cleanup starts when disk usage reaches the configured limit."""
+        config = self.minimal_config | {
+            "record": {"storage_limit": {"max_usage_percent": 90}}
+        }
+        frigate_config = FrigateConfig(**config)
+        storage = StorageMaintainer(frigate_config, MagicMock())
+
+        assert not hasattr(frigate_config.cameras["front_door"].record, "storage_limit")
+
+        with patch("frigate.storage.shutil.disk_usage") as disk_usage:
+            disk_usage.return_value = MagicMock(
+                total=1000 * pow(2, 20),
+                used=899 * pow(2, 20),
+                free=101 * pow(2, 20),
+            )
+            assert not storage.check_storage_needs_cleanup()
+
+            disk_usage.return_value = MagicMock(
+                total=1000 * pow(2, 20),
+                used=900 * pow(2, 20),
+                free=100 * pow(2, 20),
+            )
+            assert storage.check_storage_needs_cleanup()
+
+    def test_storage_cleanup_with_less_than_one_hour_free(self):
+        """Ensure the existing low available storage check remains active."""
+        config = FrigateConfig(**self.minimal_config)
+        storage = StorageMaintainer(config, MagicMock())
+        storage.camera_storage_stats = {
+            "front_door": {"bandwidth": 101, "needs_refresh": False}
+        }
+
+        with patch("frigate.storage.shutil.disk_usage") as disk_usage:
+            disk_usage.return_value = MagicMock(
+                total=1000 * pow(2, 20),
+                used=900 * pow(2, 20),
+                free=100 * pow(2, 20),
+            )
+            assert storage.check_storage_needs_cleanup()
+
+    def test_storage_limit_cannot_be_configured_per_camera(self):
+        """Ensure the recording storage limit is global only."""
+        self.minimal_config["cameras"]["front_door"]["record"] = {
+            "storage_limit": {"max_usage_percent": 90}
+        }
+
+        with self.assertRaises(ValidationError):
+            FrigateConfig(**self.minimal_config)
 
     def test_storage_cleanup(self):
         """Ensure that all recordings are cleaned up when necessary."""
