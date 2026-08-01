@@ -411,3 +411,18 @@ Two consequences follow from this being based on whole-disk free space:
 - Cleanup can run while a meaningful percentage of the disk is still free (for example, with high bitrates or many cameras), because the threshold is "less than ~1 hour of recording headroom," not "X% full."
 
 Frequent emergency cleanups usually mean your configured retention exceeds what the disk can hold. Reduce your retention days so the normal retention cleanup keeps up and the emergency path rarely triggers.
+
+### Limiting recordings to a percentage of the disk
+
+If you share the recordings drive with other data, you can cap how much of the disk recordings are allowed to fill. When the used space of the drive reaches `max_usage_percent`, Frigate deletes the oldest recordings first (the same way the emergency cleanup does) until usage drops back below the limit. This is a **global** setting and is not applied per-camera.
+
+```yaml
+record:
+  enabled: true
+  storage_limit:
+    # Delete the oldest recordings once the drive is 90% full.
+    # Set to 100 (the default) to disable.
+    max_usage_percent: 90
+```
+
+This runs alongside the free-space based emergency cleanup described above; whichever threshold is reached first triggers cleanup.

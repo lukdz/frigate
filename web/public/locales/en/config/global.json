@@ -945,6 +945,14 @@
       "label": "Record cleanup interval",
       "description": "Minutes between cleanup passes that remove expired recording segments."
     },
+    "storage_limit": {
+      "label": "Storage limit",
+      "description": "Global disk usage limit that deletes the oldest recordings once reached. This is not applied per-camera.",
+      "max_usage_percent": {
+        "label": "Maximum disk usage percent",
+        "description": "Delete the oldest recordings once used disk space reaches this percentage of the recordings drive. Set to 100 to disable. This is a global setting and is not applied per-camera."
+      }
+    },
     "continuous": {
       "label": "Continuous retention",
       "description": "Number of days to retain recordings regardless of tracked objects or motion. Set to 0 if you only want to retain recordings of alerts and detections.",

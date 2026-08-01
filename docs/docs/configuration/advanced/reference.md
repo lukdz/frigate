@@ -566,6 +566,13 @@ record:
   # Optional: Number of minutes to wait between cleanup runs (default: shown below)
   # This can be used to reduce the frequency of deleting recording segments from disk if you want to minimize i/o
   expire_interval: 60
+  # Optional: Global storage limit settings
+  # NOTE: This is a global setting and is not applied per-camera.
+  storage_limit:
+    # Optional: Delete the oldest recordings once used disk space reaches this
+    # percentage of the recordings drive (default: shown below).
+    # Set to 100 to disable.
+    max_usage_percent: 100
   # Optional: Continuous retention settings
   continuous:
     # Optional: Number of days to retain recordings regardless of tracked objects or motion (default: shown below)

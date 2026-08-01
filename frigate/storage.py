@@ -111,19 +111,48 @@ class StorageMaintainer(threading.Thread):
         hourly_bandwidth = sum(
             [b["bandwidth"] for b in self.camera_storage_stats.values()]
         )
-        remaining_storage = round(shutil.disk_usage(RECORD_DIR).free / pow(2, 20), 1)
+        disk_usage = shutil.disk_usage(RECORD_DIR)
+        remaining_storage = round(disk_usage.free / pow(2, 20), 1)
         logger.debug(
             f"Storage cleanup check: {hourly_bandwidth} hourly with remaining storage: {remaining_storage}."
         )
-        return remaining_storage < float(hourly_bandwidth)
+
+        if remaining_storage < float(hourly_bandwidth):
+            return True
+
+        max_usage_percent = self.config.record.storage_limit.max_usage_percent
+        if max_usage_percent < 100:
+            used_percent = (disk_usage.used / disk_usage.total) * 100
+            logger.debug(
+                f"Storage usage check: {used_percent:.1f}% used with limit of {max_usage_percent}%."
+            )
+            if used_percent >= max_usage_percent:
+                return True
+
+        return False
+
+    def get_cleanup_target_size(self) -> float:
+        """Return the amount of storage in MB that should be reclaimed."""
+        hourly_bandwidth = sum(
+            [b["bandwidth"] for b in self.camera_storage_stats.values()]
+        )
+        target_size = float(hourly_bandwidth)
+
+        max_usage_percent = self.config.record.storage_limit.max_usage_percent
+        if max_usage_percent < 100:
+            disk_usage = shutil.disk_usage(RECORD_DIR)
+            used_mb = disk_usage.used / pow(2, 20)
+            limit_mb = (disk_usage.total / pow(2, 20)) * (max_usage_percent / 100)
+            # reclaim enough to drop back under the configured limit
+            target_size = max(target_size, used_mb - limit_mb)
+
+        return target_size
 
     def reduce_storage_consumption(self) -> None:
         """Remove oldest hour of recordings."""
         logger.debug("Starting storage cleanup.")
         deleted_segments_size = 0
-        hourly_bandwidth = sum(
-            [b["bandwidth"] for b in self.camera_storage_stats.values()]
-        )
+        target_size = self.get_cleanup_target_size()
 
         recordings = (
             Recordings.select(
@@ -155,8 +184,8 @@ class StorageMaintainer(threading.Thread):
         event_start = 0
         deleted_recordings = []
         for recording in recordings:
-            # check if 1 hour of storage has been reclaimed
-            if deleted_segments_size > hourly_bandwidth:
+            # check if the target amount of storage has been reclaimed
+            if deleted_segments_size > target_size:
                 break
 
             keep = False
@@ -195,9 +224,9 @@ class StorageMaintainer(threading.Thread):
                     pass
 
         # check if need to delete retained segments
-        if deleted_segments_size < hourly_bandwidth:
+        if deleted_segments_size < target_size:
             logger.error(
-                f"Could not clear {hourly_bandwidth} MB, currently {deleted_segments_size:.2f} MB have been cleared. Retained recordings must be deleted."
+                f"Could not clear {target_size} MB, currently {deleted_segments_size:.2f} MB have been cleared. Retained recordings must be deleted."
             )
             recordings = (
                 Recordings.select(
@@ -214,7 +243,7 @@ class StorageMaintainer(threading.Thread):
             )
 
             for recording in recordings:
-                if deleted_segments_size > hourly_bandwidth:
+                if deleted_segments_size > target_size:
                     break
 
                 try:
@@ -294,9 +323,7 @@ class StorageMaintainer(threading.Thread):
                 logger.debug(f"Default camera bandwidths: {self.camera_storage_stats}.")
 
             if self.check_storage_needs_cleanup():
-                logger.info(
-                    "Less than 1 hour of recording space left, running storage maintenance..."
-                )
+                logger.info("Storage limit reached, running storage maintenance...")
                 self.reduce_storage_consumption()
 
         logger.info("Exiting storage maintainer...")

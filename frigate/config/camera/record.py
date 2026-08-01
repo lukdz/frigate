@@ -17,6 +17,7 @@ __all__ = [
     "ReviewRetainConfig",
     "RecordRetainConfig",
     "RetainModeEnum",
+    "StorageLimitConfig",
 ]
 
 
@@ -26,6 +27,16 @@ class RecordRetainConfig(FrigateBaseModel):
         ge=0,
         title="Retention days",
         description="Days to retain recordings.",
+    )
+
+
+class StorageLimitConfig(FrigateBaseModel):
+    max_usage_percent: float = Field(
+        default=100,
+        ge=0,
+        le=100,
+        title="Maximum disk usage percent",
+        description="Delete the oldest recordings once used disk space reaches this percentage of the recordings drive. Set to 100 to disable. This is a global setting and is not applied per-camera.",
     )
 
 
@@ -120,6 +131,11 @@ class RecordConfig(FrigateBaseModel):
         default=60,
         title="Record cleanup interval",
         description="Minutes between cleanup passes that remove expired recording segments.",
+    )
+    storage_limit: StorageLimitConfig = Field(
+        default_factory=StorageLimitConfig,
+        title="Storage limit",
+        description="Global disk usage limit that deletes the oldest recordings once reached. This is not applied per-camera.",
     )
     continuous: RecordRetainConfig = Field(
         default_factory=RecordRetainConfig,
